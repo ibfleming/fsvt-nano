@@ -6,7 +6,8 @@
 
 = Project: Stream Velocity Measuring Device
 
-Describe your project
+This project is responsible for developing a stream velocity measuring device for the USDA National Forest Service.
+This repository contains the coding base and backend for our Arduino Nanos and other various modules/micro-controllers.
 
 == Step 1: Installation
 Please describe the steps to install this project.
