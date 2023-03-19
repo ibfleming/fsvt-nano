@@ -4,7 +4,7 @@
 :Revision: 1.0.0
 :License: Public Domain
 
-= Project: This is the backend coding base for the stream velocity measuring device!
+= Project: Stream Velocity Measuring Device
 
 Describe your project
 
