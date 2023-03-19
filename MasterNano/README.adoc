@@ -10,24 +10,19 @@ This project is responsible for developing a stream velocity measuring device fo
 This repository contains the coding base and backend for our Arduino Nanos and other various modules/micro-controllers.
 
 == Step 1: Installation
-Please describe the steps to install this project.
+...
 
-For example:
-
-1. Open this file
-2. Edit as you like
-3. Release to the World!
+1. ...
+2. ...
+3. ...
 
 == Step 2: Assemble the circuit
-
-Assemble the circuit following the diagram layout.png attached to the sketch
+...
 
 == Step 3: Load the code
-
-Upload the code contained in this sketch on to your board
+...
 
 === Folder structure
-
 ....
  MasterNano                => Arduino sketch folder
   ├── MasterNano.ino       => main, Master Nano Arduino file
@@ -36,10 +31,10 @@ Upload the code contained in this sketch on to your board
 ....
 
 === License
-This project is released under a {License} License.
+This project is released under the GNU General Public License.
 
 === Contributing
-To contribute to this project please contact ibfleming https://id.arduino.cc/ibfleming
+To contribute to this project please contact Ian Fleming, https://id.arduino.cc/ibfleming.
 
 === BOM
 Add the bill of the materials you need for this project.
@@ -51,7 +46,6 @@ Add the bill of the materials you need for this project.
 | 3  | HC-06 BT       | xxx         | 1
 | 4  | TDS Meter      | xxx         | 2
 |===
-
 
 === Help
 This document is written in the _AsciiDoc_ format, a markup language to describe documents.
