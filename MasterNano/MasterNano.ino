@@ -13,12 +13,12 @@
 #include <EEPROM.h>
 #include <Wire.h>
 
-#define DEBUG true
+#define DEBUG true  // Debugging mode!
 
 // PINS
 #define rxPin 18        // D18, Receive Pin (RX) for I2C buss
 #define txPin 19        // D19, Transmit Pin (TX) for I2c bus
-#define tdsPin A1       // A1, TDS Meter Pin
+#define tdsPin A1       // A1, TDS Meter Pin, Analog Pin!
 
 // For TDS (from basic example)
 #define VREF 5.0        // Analog Reference Voltage of the ADC
@@ -28,22 +28,27 @@
 struct TDSData {
   float tdsValue;       // The TDS value, calculated in getTDSVal().
   float voltage;        // Average voltage, calculated in getTDSVal().
-} TDSData;
+};
 
-SoftwareSerial BTSerial(rxPin, txPin);        // Open Software Serial between Nano and HM-10 BT module on I2C lane.
-unsigned long ProgramClock = 0;               // Timer/Clock of entire program, in milliseconds
+// For fetchTDS() => Must be global to account for program timing.
+int TDSBuffer[SCOUNT], TDSBufferTemp[SCOUNT];                   // Array buffers for incoming TDS data.
+int TDSBufferIndex = 0, tempIndex = 0;                          // Indexes for buffers.
+float avgV = 0, tdsVal = 0, temperature = 25.0;                 // Voltage, TDS, and temperature value.
+
+SoftwareSerial BTSerial(rxPin, txPin);                  // Open Software Serial between Nano and HM-10 BT module on I2C lane.
+static unsigned long programClock = millis();           // Timer/Clock of entire program, in milliseconds.
+// millis() => Returns the number of milliseconds passed since the Arduino board began running the current program
 
 // DEFINITIONS
 int getMedianNum(int bArray[], int iFilterLen);
-void fetchTDS(TDSData * TDS, unsigned long clock);
 float calculateTDS(float cVal);
+void fetchTDS(TDSData * TDS);
 
 /*  ==================================================
     SETUP
     ================================================== */
 void setup() {
-  // Open serial communication.
-  Serial.begin(115200);
+  Serial.begin(115200);         // Open serial communication.     
   pinMode(tdsPin, INPUT);
 }
 
@@ -51,25 +56,28 @@ void setup() {
     LOOP
     ================================================== */
 void loop() {
-  // millis() => Returns the number of milliseconds passed since the Arduino board began running the current program
-  unsigned long clock = millis(); // Real operations of the program begin upon loop entry. Get the initial time when this begins.
   TDSData * TDS = new TDSData;
   // TDS->tdsValue = -1;
   // TDS->voltage = -1;
-
-  fetchTDS(TDS, clock);  // Get the TDS value and average voltage of that reading. Approximately 840ms have passed.
-
+  fetchTDS(TDS);  // Get the TDS value and average voltage of that reading. Approximately 840ms (or a multiple) has to pass until a value is actually received, else equal 0.
+  unsigned long tdsClockIteration = millis() - programClock;   // This value represents the amount of time that this function finished executing.
 
   if( DEBUG ) {
-    Serial.print("TDS Value: ");
-    Serial.print(TDS->tdsValue, 0);
-    Serial.print("ppm\t");
-    Serial.print("Voltage: ");
-    Serial.print(TDS->voltage, 2);
-    Serial.println("V");
+    if( TDS->tdsValue != -1 && TDS->voltage != -1 ) {
+      Serial.print("(");
+      Serial.print(tdsClockIteration);
+      Serial.print("ms): ");    
+      Serial.print("TDS Value: ");
+      Serial.print(TDS->tdsValue, 0);
+      Serial.print("ppm\t");
+      Serial.print("Voltage: ");
+      Serial.print(TDS->voltage, 2);
+      Serial.println("V");
+    }
   }
 
   delete TDS;
+  programClock = millis();
 }
 /*  ==================================================
     getMedianNum :: From DFRobot Basic Example...
@@ -106,36 +114,11 @@ int getMedianNum(int bArray[], int iFilterLen) {
 /*  ==================================================
     getTDSVal :: From DFRobot Basic Example...
     Calculates the TDS reading from the meter/probe.
-    Various conversions for the value, etc.
+    "Convert voltage value to tds value."
     ================================================== */
-void fetchTDS(TDSData * TDS, unsigned long clock) {
-  int TDSBuffer[SCOUNT], TDSBufferTemp[SCOUNT];             // Array buffers for incoming TDS data.
-  int TDSBufferIndex = 0, tempIndex = 0;                          // Indexes for buffers.
-  float avgV = 0, tdsVal = 0, temperature = 25.0;           // Voltage, TDS, and temperature value.
-
-  static unsigned long analogSampleTimepoint = clock;       // Get initial timepoint when we entered the loop.
-  if( millis() - analogSampleTimepoint > 40U ) {            // Every 40 milliseconds, read the analog value from the ADC. 40U is essentially the refresh rate of data fetching.
-    analogSampleTimepoint = millis();
-    analogBuffer[analogBufferIndex] = analogRead(TdsSensorPin);       //read the analog value and store into the buffer
-    analogBufferIndex++;
-    if( analogBufferIndex == SCOUNT ) { analogBufferIndex = 0; }
-  }
-
-  static unsigned long printTimepoint = millis();             // Get initial timepoint (at this point, we know approximately that 40ms has passed)     
-  if( millis() - printTimepoint > 800U ) {                    // Every 800 milliseconds, conver the analog value from the ADC.
-     //printTimepoint = millis();                             // Assigning to a static variable? This value should be 840ms after if-statement. [DON'T BELIEVE THIS DOES ANYTHING...]
-     for( tempIndex = 0; tempIndex < SCOUNT; tempIndex++ ) { TDSBufferTemp[tempIndex] = TDSBuffer[tempIndex]; }
-     avgV = getMedianNum(TDSBufferTemp, SCOUNT) * (float)VREF / 1024.0;           // See function description for use-case here...
-     float compensationCoefficient = 1.0 + 0.02 * ( temperature - 25.0 );         // Temperature compensation formula: fFinalResult(25^C) = fFinalResult(current)/(1.0+0.02*(fTP-25.0));
-     float compensationVolatge = averageVoltage / compensationCoefficient;        // Temperature compensation.
-     tdsVal = (133.42 * compensationVolatge * compensationVolatge * compensationVolatge - 255.86 * compensationVolatge * compensationVolatge + 857.39 * compensationVolatge) * 0.5; //convert voltage value to tds value
-
-     TDS->tdsValue = tdsVal;
-     TDS->voltage = avgV;
-  }
-
-  // At this point, approximately 840ms has passed. So, we are 260ms from reaching a full second cycle.
-  return tdsVal; 
+float calculateTDS(float cVal) {
+  float tds = (133.42 * cVal * cVal * cVal - 255.86 * cVal * cVal + 857.39 * cVal) * 0.5; // Calculates the ppm using voltage inputs.
+  return tds;
 }
 
 /*  ==================================================
@@ -143,6 +126,27 @@ void fetchTDS(TDSData * TDS, unsigned long clock) {
     Calculates the TDS reading from the meter/probe.
     Various conversions for the value, etc.
     ================================================== */
-float calculateTDS(float cVal) {
-  //(133.42 * compensationVolatge * compensationVolatge * compensationVolatge - 255.86 * compensationVolatge * compensationVolatge + 857.39 * compensationVolatge) * 0.5;
+void fetchTDS(TDSData * TDS) {
+  static unsigned long analogSampleTimepoint = millis();       // Get initial timepoint when we entered the loop (lookClock).
+  if( millis() - analogSampleTimepoint > 40U ) {            // Every 40 milliseconds, read the analog value from the ADC. 40U is essentially the refresh rate of data fetching [Make it a variable?]
+    analogSampleTimepoint = millis();                       // Assigning to a static variable? This value should be ~40ms after if-statement.
+    TDSBuffer[TDSBufferIndex] = analogRead(tdsPin);         // Read the analog value and store into the buffer. ### WHERE THE RAW DATA GETS READ FROM THE DFROBOT GRAVITY TDS ###
+    TDSBufferIndex++;
+    if( TDSBufferIndex == SCOUNT ) { TDSBufferIndex = 0; }
+  }
+
+  static unsigned long printTimepoint = millis();             // Get initial timepoint (at this point, we know approximately that 40ms has passed).     
+  if( millis() - printTimepoint > 800U ) {                    // Every 800 milliseconds, convert the analog value from the ADC. 800U might be a variable that should be changed/dynamic.
+     printTimepoint = millis();                               // Assigning to a static variable? This value should be 840ms after if-statement.
+     for( tempIndex = 0; tempIndex < SCOUNT; tempIndex++ ) { TDSBufferTemp[tempIndex] = TDSBuffer[tempIndex]; }
+     avgV = getMedianNum(TDSBufferTemp, SCOUNT) * (float)VREF / 1024.0;           // See function description for use-case here...
+     float compensationCoefficient = 1.0 + 0.02 * ( temperature - 25.0 );         // Temperature compensation formula: fFinalResult(25^C) = fFinalResult(current)/(1.0+0.02*(fTP-25.0));
+     float compensationVoltage = avgV / compensationCoefficient;                  // Temperature compensation.
+     tdsVal = calculateTDS(compensationVoltage);
+
+     TDS->tdsValue = tdsVal;
+     TDS->voltage = avgV;
+  }
+  // At this point, approximately 840ms has passed. So, we are 260ms from reaching a full second cycle. This might be important in calculating refresh speeds.
 }
+

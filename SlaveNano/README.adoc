@@ -1,0 +1,53 @@
+:Author: ibfleming
+:Email: flem8015@vandals.uidaho.edu
+:Date: 18/03/2023
+:Revision: 1.0.0
+:License: Public Domain
+
+= Project: Stream Velocity Measuring Device
+
+This project is responsible for developing a stream velocity measuring device for the USDA National Forest Service.
+This repository contains the coding base and backend for our Arduino Nanos and other various modules/micro-controllers.
+
+== Step 1: Installation
+...
+
+1. ...
+2. ...
+3. ...
+
+== Step 2: Assemble the circuit
+...
+
+== Step 3: Load the code
+...
+
+=== Folder structure
+....
+ MasterNano                => Arduino sketch folder
+  ├── MasterNano.ino       => main, Master Nano Arduino file
+  ├── SlaveNano.ino        => Slave Nano Arduino file
+  └── ReadMe.adoc          => this file, documentation
+....
+
+=== License
+This project is released under the GNU General Public License.
+
+=== Contributing
+To contribute to this project please contact Ian Fleming, https://id.arduino.cc/ibfleming.
+
+=== BOM
+Add the bill of the materials you need for this project.
+
+|===
+| ID | Part name      | Part number | Quantity
+| 1  | Arduino Nano   | xxx         | 2
+| 2  | HC-10 BT       | xxx         | 1
+| 3  | HC-06 BT       | xxx         | 1
+| 4  | TDS Meter      | xxx         | 2
+|===
+
+=== Help
+This document is written in the _AsciiDoc_ format, a markup language to describe documents.
+If you need help you can search the http://www.methods.co.nz/asciidoc[AsciiDoc homepage]
+or consult the http://powerman.name/doc/asciidoc[AsciiDoc cheatsheet]
