@@ -37,6 +37,7 @@ float avgV = 0, tdsVal = 0, temperature = 25.0;                 // Voltage, TDS,
 
 SoftwareSerial BTSerial(rxPin, txPin);                  // Open Software Serial between Nano and HM-10 BT module on I2C lane.
 static unsigned long programClock = millis();           // Timer/Clock of entire program, in milliseconds.
+unsigned long timeCount = 1000;                              // Counter for a single second that has passed. (1000ms = 1s)
 // millis() => Returns the number of milliseconds passed since the Arduino board began running the current program
 
 // DEFINITIONS
@@ -76,8 +77,13 @@ void loop() {
     }
   }
 
+  // This might be helpful in getting a whole number of the amount of time that has passed during the measuring process that we can send to the app...
+  // If the programClock (ms) is over the first single second, increment the timeCount by another second...
+  if ( programClock > timeCount ) { 
+    timeCount += 1000;
+  }
   delete TDS;
-  programClock = millis();
+  programClock = millis();  // programClock is initialized in Global scope. After iteration of each loop, get the current timepoint of this "sample" iteration...
 }
 /*  ==================================================
     getMedianNum :: From DFRobot Basic Example...
