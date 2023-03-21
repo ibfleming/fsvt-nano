@@ -16,8 +16,8 @@
 #define DEBUG true  // Debugging mode!
 
 // PINS
-#define rxPin 18        // D18, Receive Pin (RX) for I2C buss
-#define txPin 19        // D19, Transmit Pin (TX) for I2c bus
+#define rxPin 18        // D18 (A4), Receive Pin (RX) for I2C buss
+#define txPin 19        // D19 (A5), Transmit Pin (TX) for I2c bus
 #define tdsPin A1       // A1, TDS Meter Pin, Analog Pin!
 
 // For TDS (from basic example)
