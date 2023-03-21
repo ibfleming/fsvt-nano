@@ -12,8 +12,10 @@
 #include <SoftwareSerial.h>
 #include <EEPROM.h>
 #include <Wire.h>
+#include "GravityTDS.h"
 
-#define DEBUG true  // Debugging mode!
+#define DEBUG true      // Debugging mode!
+#define CALIBRATE false  // Calibration mode!
 
 // PINS
 #define rxPin 18        // D18 (A4), Receive Pin (RX) for I2C buss
@@ -32,6 +34,7 @@ int analogBufferIndex = 0, copyIndex = 0;                           // Indexes f
 float averageVoltage = 0, tdsValue = 0, temperature = 25.0;           // Voltage, TDS, and temperature value.
 
 SoftwareSerial HC12(rxPin, txPin);                  // Open Software Serial between Nano and HM-10 BT module on I2C lane.
+GravityTDS gravityTDS;                              // DFRobot Calibration object.
 
 // DEFINITIONS
 int getMedianNum(int bArray[], int iFilterLen);
@@ -43,14 +46,34 @@ void fetchTDS();
     ================================================== */
 void setup() {
   Serial.begin(115200);         // Open serial communication.     
-  pinMode(tdsPin, INPUT);
+
+  if( CALIBRATE ) {
+    gravityTDS.setPin(tdsPin);
+    gravityTDS.setAref(5.0);
+    gravityTDS.setAdcRange(1024);
+    gravityTDS.begin();
+  }
+  else {
+    pinMode(tdsPin, INPUT);
+  }
 }
 
 /*  ==================================================
     LOOP
     ================================================== */
 void loop() {
-  fetchTDS();  // Get the TDS value and average voltage of that reading. Approximately 840ms (or a multiple) has to pass until a value is actually received, else equal 0.
+  if( CALIBRATE ) {
+    gravityTDS.setTemperature(temperature);
+    gravityTDS.update();
+    tdsValue = gravityTDS.getTdsValue();
+    Serial.print("[CALIBRATION] TDS: ");
+    Serial.print(tdsValue, 0);
+    Serial.println("ppm");
+    delay(1000);
+  }
+  else {
+    fetchTDS();  // Get the TDS value and average voltage of that reading. Approximately 840ms (or a multiple) has to pass until a value is actually received, else equal 0.
+  }
 }
 
 /*  ==================================================
