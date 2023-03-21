@@ -23,7 +23,7 @@
 
 SoftwareSerial HC12(rxPin, txPin);                  // Open Software Serial between Nano and HM-10 BT module on I2C lane.
 GravityTDS gravityTDS;                              // DFRobot Calibration object.
-float tdsValue = 0;
+float tdsValue_1 = 0;
 
 // DEFINITIONS
 void fetchTDS();
@@ -41,22 +41,23 @@ void setup() {
     LOOP
     ================================================== */
 void loop() {
-  fetchTDS();  // Get the TDS value and average voltage of that reading. Approximately 840ms (or a multiple) has to pass until a value is actually received, else equal 0.
+  tdsValue_1 = fetchTDS();  // Get the TDS value and average voltage of that reading.
 }
 
 /*  ==================================================
-    getTDSVal :: From DFRobot Basic Example...
+    fetchTDS
     Calculates the TDS reading from the meter/probe.
-    Various conversions for the value, etc.
+    Utilizes the built-in library from GravityTDS.
     ================================================== */
 void fetchTDS() {
   gravityTDS.update();
-  tdsValue = gravityTDS.getTdsValue();
+  float tdsValue = gravityTDS.getTdsValue();
   if( DEBUG ) { 
     Serial.print("TDS: ");
     Serial.print(tdsValue, 0);
     Serial.println("ppm");
   }
   delay(1000);
+  return tdsValue;
 }
 
