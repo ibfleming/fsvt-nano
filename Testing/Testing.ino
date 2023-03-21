@@ -26,7 +26,6 @@ void setup()
 {
     Serial.begin(115200);
     pinMode(TdsSensorPin,INPUT);
-    delay(1000);
 }
 
 void loop()
