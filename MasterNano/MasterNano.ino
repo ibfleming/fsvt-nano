@@ -17,8 +17,8 @@
 #define DEBUG true      // Debugging mode!
 
 // PINS
-#define rxPin 18        // D18 (A4), Receive Pin (RX) for I2C buss
-#define txPin 19        // D19 (A5), Transmit Pin (TX) for I2C bus
+#define rxPin 2        // D2, Receive Pin (RX) 
+#define txPin 3        // D3, Transmit Pin (TX)
 #define tdsPin A0       // A1, TDS Meter Pin, Analog Pin!
 
 SoftwareSerial HC12(rxPin, txPin);                  // Open Software Serial between Nano and HM-10 BT module on I2C lane.
@@ -34,28 +34,25 @@ float fetchTDS();
     ================================================== */
 void setup() {
   Serial.begin(115200);         // Open serial communication.
-  Serial.println("Type AT commands!");
+
+  pinMode(rxPin, INPUT);
+  pinMode(txPin, OUTPUT);
   HC12.begin(9600);             // Open BT communication.
-  gravityTDS.setPin(tdsPin);
-  gravityTDS.begin();
+
+  //gravityTDS.setPin(tdsPin);
+  //gravityTDS.begin();
 }
 
 /*  ==================================================
     LOOP
     ================================================== */
 void loop() {
-  if( HC12.available() ) {
-    //tdsValue_1 = fetchTDS();  // Get the TDS value and average voltage of that reading.
-    while( HC12.available() ) {
-      command += (char)mySerial.read();
-    }
-    Serial.println(command);
-    command = "";
+  HC12.println("AT");
+  delay(500);
+  while( HC12.available() ) {
+    Serial.write(HC12.read());
   }
-  if( Serial.available() ) {
-    delay(10);
-    mySerial.write(Serial.read());
-  }
+  delay(1000);
 }
 
 /*  ==================================================
