@@ -24,6 +24,7 @@
 SoftwareSerial HC12(rxPin, txPin);                  // Open Software Serial between Nano and HM-10 BT module on I2C lane.
 GravityTDS gravityTDS;                              // DFRobot Calibration object.
 float tdsValue_1 = 0;
+String command = "";
 
 // DEFINITIONS
 float fetchTDS();
@@ -32,8 +33,9 @@ float fetchTDS();
     SETUP
     ================================================== */
 void setup() {
-  Serial.begin(9600);         // Open serial communication.
-  HC12.begin(115200);         // Open BT communication.
+  Serial.begin(115200);         // Open serial communication.
+  Serial.println("Type AT commands!");
+  HC12.begin(9600);             // Open BT communication.
   gravityTDS.setPin(tdsPin);
   gravityTDS.begin();
 }
@@ -42,9 +44,18 @@ void setup() {
     LOOP
     ================================================== */
 void loop() {
-  tdsValue_1 = fetchTDS();  // Get the TDS value and average voltage of that reading.
-  HC12.write(tdsValue_1);
-  HC12.println("Send data packets over Bluetooth!\n");
+  if( HC12.available() ) {
+    //tdsValue_1 = fetchTDS();  // Get the TDS value and average voltage of that reading.
+    while( HC12.available() ) {
+      command += (char)mySerial.read();
+    }
+    Serial.println(command);
+    command = "";
+  }
+  if( Serial.available() ) {
+    delay(10);
+    mySerial.write(Serial.read());
+  }
 }
 
 /*  ==================================================
