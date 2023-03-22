@@ -18,21 +18,22 @@
 
 // PINS
 #define rxPin 18        // D18 (A4), Receive Pin (RX) for I2C buss
-#define txPin 19        // D19 (A5), Transmit Pin (TX) for I2c bus
-#define tdsPin A1       // A1, TDS Meter Pin, Analog Pin!
+#define txPin 19        // D19 (A5), Transmit Pin (TX) for I2C bus
+#define tdsPin A0       // A1, TDS Meter Pin, Analog Pin!
 
 SoftwareSerial HC12(rxPin, txPin);                  // Open Software Serial between Nano and HM-10 BT module on I2C lane.
 GravityTDS gravityTDS;                              // DFRobot Calibration object.
 float tdsValue_1 = 0;
 
 // DEFINITIONS
-void fetchTDS();
+float fetchTDS();
 
 /*  ==================================================
     SETUP
     ================================================== */
 void setup() {
-  Serial.begin(115200);         // Open serial communication.
+  Serial.begin(9600);         // Open serial communication.
+  HC12.begin(115200);         // Open BT communication.
   gravityTDS.setPin(tdsPin);
   gravityTDS.begin();
 }
@@ -42,6 +43,8 @@ void setup() {
     ================================================== */
 void loop() {
   tdsValue_1 = fetchTDS();  // Get the TDS value and average voltage of that reading.
+  HC12.write(tdsValue_1);
+  HC12.println("Send data packets over Bluetooth!\n");
 }
 
 /*  ==================================================
@@ -49,7 +52,7 @@ void loop() {
     Calculates the TDS reading from the meter/probe.
     Utilizes the built-in library from GravityTDS.
     ================================================== */
-void fetchTDS() {
+float fetchTDS() {
   gravityTDS.update();
   float tdsValue = gravityTDS.getTdsValue();
   if( DEBUG ) { 
