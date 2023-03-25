@@ -1,3 +1,5 @@
+#include <GravityTDS.h>
+
 /*  ==================================================
     MASTER ARDUINO NANO (v2)
     Hardware Modules:
@@ -14,76 +16,66 @@
 #include <Wire.h>
 #include "GravityTDS.h"
 
-#define DEBUG true      // Debugging mode!
+#define DEBUG false      // Debugging mode!
 #define ON  HIGH
 #define OFF LOW
 #define ATMODE true     // Enter AT for BT!
 
 // PINS
-#define rxPin 4         // D4, Receive Pin (RX) 
-#define txPin 5         // D5, Transmit Pin (TX)
+#define HMrxPin 10         // D4, Receive Pin (RX) 
+#define HMtxPin 11         // D5, Transmit Pin (TX)
+#define HCrxPin 5         // D4, Receive Pin (RX) 
+#define HCtxPin 6         // D5, Transmit Pin (TX)
 #define tdsPin 14       // A0 (D14), TDS Meter Pin, Analog Pin!
-#define BTSet 10        // D10, Set Pin for BT, AT Mode
 
-SoftwareSerial BT(rxPin, txPin);      // Open BT Serial, RX | TX
+SoftwareSerial HM10(HMrxPin, HMtxPin);      // Open BT Serial, RX | TX
+SoftwareSerial HC12(HCrxPin, HCtxPin);      // Open BT Serial, RX | TX
 GravityTDS gravityTDS;                  // DFRobot Calibration object.
-float tdsValue_1 = 0;
 
-int flag = 0;
-int LED = 8;
+float tdsTemp;
+char tdsValue_1[4];
+
+unsigned long prevTime = 0;
 
 // DEFINITIONS
+void flushBuffers();
+void clearSerialBuffer(SoftwareSerial& serial);
+void clearHardwareBuffer(HardwareSerial& serial);
 float fetchTDS();
 
 /*  ==================================================
     SETUP
     ================================================== */
 void setup() {
-
-  if( ATMODE ) {
-    pinMode(BTSet, OUTPUT);
-    digitalWrite(BTSet, OFF);
-    Serial.begin(9600);
-    BT.begin(38400);
-    delay(50);
-    Serial.println("Enter AT commands:");
-  }
-  else {
-    Serial.begin(9600);         // Open serial communication.
-    BT.begin(9600);             // Open BT communication.
-    pinMode(LED, OUTPUT);
-    gravityTDS.setPin(tdsPin);
-    gravityTDS.begin();
-    delay(50);
-    Serial.println("Ready to connect!");
-  }
+  Serial.begin(9600);
+  HM10.begin(9600);
+  HC12.begin(38400);
+  clearHardwareBuffer(Serial);
+  clearSerialBuffer(HM10);
+  clearSerialBuffer(HC12);
 }
 
 /*  ==================================================
     LOOP
     ================================================== */
 void loop() {
-  if( ATMODE ) {
-    if( BT.available() ) {
-      Serial.write(BT.read());
-    }
-    if( Serial.available() ) {
-      BT.write(Serial.read());
-    }
+
+  if( Serial.available() ) {
+    HM10.write(Serial.read());
   }
-  else {
-    if( BT.available() ) {
-      flag = BT.read();
-      if( flag == 1 ) {
-        digitalWrite(LED, ON);
-        Serial.println("LED On");
-      }
-      else if( flag == 0 ) {
-        digitalWrite(LED, OFF);
-        Serial.println("LED Off");
-      }
-    }
+
+  // Send Probe 1 Data every 1000 ms.
+  unsigned long currTime = millis();
+  if( currTime -  prevTime >= 1000UL ) {
+    prevTime = currTime;
+    tdsTemp = fetchTDS();
+    dtostrf(tdsTemp, 3, 0, tdsValue_1);
+    HM10.print("Probe 1: ");
+    HM10.write(tdsValue_1);
+    HM10.println();
+    delay(50);
   }
+
 }
 
 /*  ==================================================
@@ -99,7 +91,18 @@ float fetchTDS() {
     Serial.print(tdsValue, 0);
     Serial.println("ppm");
   }
-  delay(1000);
   return tdsValue;
+}
+
+void clearSerialBuffer(SoftwareSerial& serial) {
+  while (serial.available() > 0) {
+    char incomingByte = serial.read();
+  }
+}
+
+void clearHardwareBuffer(HardwareSerial& serial) {
+  while (serial.available() > 0) {
+    char incomingByte = serial.read();
+  }
 }
 
