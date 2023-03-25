@@ -1,7 +1,7 @@
 /*  ==================================================
     SLAVE ARDUINO NANO
     Hardware Modules:
-    - HC-06 Bluetooth Module (Slave)
+    - HC-12 Bluetooth Transceiver
     - DFRobot Gravity: Analog TDS Sensor/Meter
     Analog read-in from TDS Sensor and transmits over BT to
     Master Nano.
@@ -9,56 +9,121 @@
 
 #include <SoftwareSerial.h>
 #include <EEPROM.h>
+#include <Wire.h>
 #include "GravityTDS.h"
 
-#define TDS_PIN A0
-#define LATENCY 1000
-
-SoftwareSerial BTSerial(2, 3);
-GravityTDS gTDS;
-
-float temperature = 25;   // May not need...
-float tdsVal = 0;
+#define DEBUG false         // Debugging mode.
+#define HCrxPin 5           // D4, Receive Pin (RX) => BT TX
+#define HCtxPin 6           // D5, Transmit Pin (TX) => BT RX
+#define setPin 2            // D2, Set Pin for BT AT-Commands.
 
 /*  ==================================================
-    SETUP
+    Globals
+    ================================================== */
+SoftwareSerial HC12(HCrxPin, HCtxPin);      // Open Software Serial, RX | TX
+GravityTDS gravityTDS;                      // DFRobot object.
+
+float tdsTemp;
+char tdsValue_2[4];                         // Range is 0-9999?
+byte incomingByte;
+String readBuffer = "";
+unsigned long prevTime = 0;
+
+/*  ==================================================
+    Function Definitions
+    ================================================== */
+float fetchTDS();
+void clearSerialBuffer(SoftwareSerial& serial);
+void clearHardwareBuffer(HardwareSerial& serial);
+void applyHC12Settings(HardwareSerial& hSerial, SoftwareSerial& sSerial);
+
+/*  ==================================================
+    Setup
     ================================================== */
 void setup() {
-  // Start the serial communication with the BT module.
-  BTSerial.begin(9600);
-  
-  // Start the serial communcation with the Gravity TDS.
-  Serial.begin(115200);
-  gTDS.setPin(TDS_PIN);
-  gTDS.setAref(5.0);
-  gTDS.setAdcRange(1024);
-  
-  gTDS.begin();
-  
-  // Wait for the BT connection from the Master.
-  while( !BTSerial.available() ) {
-    delay(10);
-  }
-  
-  // Connection between master/slave is established!
-  BTSerial.print("Connection established!\n");
+  Serial.begin(38400);
+  HC12.begin(38400);
+  clearHardwareBuffer(Serial);
+  clearSerialBuffer(HC12);
+  pinMode(setPin, OUTPUT);
+  applyHC12Settings(Serial, HC12);
 }
 
 /*  ==================================================
-    LOOP
+    Loop
     ================================================== */
 void loop() {
-  gTDS.update();
-  tdsVal = gTDS.getTdsValue();
-  
-  /* Print Slave TDS prior to transmitting to BT
-  Serial.print("Slave TDS: ");
-  Serial.print(tdsValue, 0);
-  Serial.println("ppm");
-  */
-  
-  // Send the TDS value to the Master Nano over BT
-  BTSerial.write((byte *)&tdsVal, sizeof(float));
-  
-  delay(LATENCY); // 1 sec delay
+  while( Serial.available() ) {
+    HC12.write(Serial.read());
+  }
+
+  unsigned long currTime = millis();
+  if( currTime - prevTime >= 1000UL ) {
+    prevTime = currTime;
+    tdsTemp = fetchTDS();
+    dtostrf(tdsTemp, 3, 0, tdsValue_2);
+    HC12.print("Probe 2: ");
+    HC12.write(tdsValue_2);
+    HC12.println();
+    delay(50);
+  }
+}
+
+/*  ==================================================
+    fetchTDS
+    Calculates the TDS reading from the meter/probe.
+    Utilizes the built-in library from GravityTDS.
+    ================================================== */
+float fetchTDS() {
+  gravityTDS.update();
+  float tdsValue = gravityTDS.getTdsValue();
+  if( DEBUG ) { 
+    Serial.print("TDS: ");
+    Serial.print(tdsValue, 0);
+    Serial.println("ppm");
+  }
+  return tdsValue;
+}
+
+/*  ==================================================
+    clearSerialBuffer
+    ================================================== */
+void clearSerialBuffer(SoftwareSerial& serial) {
+  while (serial.available() > 0) {
+    char incomingByte = serial.read();
+  }
+}
+
+/*  ==================================================
+    clearHardwareBuffer
+    ================================================== */
+void clearHardwareBuffer(HardwareSerial& serial) {
+  while (serial.available() > 0) {
+    char incomingByte = serial.read();
+  }
+}
+
+/*  ==================================================
+    applyHC12Settings - Apply these on setup. Values aren't
+    saved in memory.
+    ================================================== */
+void applyHC12Settings(HardwareSerial& hSerial, SoftwareSerial& sSerial) {
+  digitalWrite(setPin, LOW);
+  delay(50);
+  HC12.print("AT+C033");
+  delay(50);
+  HC12.print("AT+B38400");
+  delay(50);
+  HC12.print("AT+V");
+  delay(50);
+  Serial.println("[Second Nano, HC-12] AT Command Output:");
+  while( HC12.available() ) {   
+    Serial.write(HC12.read());
+  }
+  Serial.println();
+  digitalWrite(setPin, HIGH);
+  delay(50);
+  clearHardwareBuffer(hSerial);
+  clearSerialBuffer(sSerial);
+  delay(50);
 }

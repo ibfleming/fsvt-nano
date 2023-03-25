@@ -1,9 +1,8 @@
-#include <GravityTDS.h>
-
 /*  ==================================================
     MASTER ARDUINO NANO (v2)
     Hardware Modules:
-    - HC-10 Bluetooth Module (Master)
+    - HM-10 Bluetooth Module (Master)
+    - HC-12 Bluetooth Transceiver
     - DFRobot Gravity: Analog TDS Sensor/Meter
     Analog read-in from TDS Sensor and is send over BT to the Android app.
     RX of BT module receives TDS Sensor data and transmit to Android app.
@@ -16,32 +15,26 @@
 #include <Wire.h>
 #include "GravityTDS.h"
 
-#define DEBUG false      // Debugging mode!
-#define ON  HIGH
-#define OFF LOW
-#define ATMODE true     // Enter AT for BT!
-
-// PINS
-#define HMrxPin 10         // D4, Receive Pin (RX) 
-#define HMtxPin 11         // D5, Transmit Pin (TX)
-#define HCrxPin 5         // D4, Receive Pin (RX) 
-#define HCtxPin 6         // D5, Transmit Pin (TX)
-#define tdsPin 14       // A0 (D14), TDS Meter Pin, Analog Pin!
+#define DEBUG false         // Debugging mode!
+#define HMrxPin 10          // D10, Receive Pin (RX) => BT TX
+#define HMtxPin 11          // D11, Transmit Pin (TX) => BT RX
+#define HCrxPin 5           // D4, Receive Pin (RX) => BT TX
+#define HCtxPin 6           // D5, Transmit Pin (TX) => BT RX
+#define setPin 2            // A0 (D14), TDS Meter Pin, Analog Pin
 
 SoftwareSerial HM10(HMrxPin, HMtxPin);      // Open BT Serial, RX | TX
 SoftwareSerial HC12(HCrxPin, HCtxPin);      // Open BT Serial, RX | TX
-GravityTDS gravityTDS;                  // DFRobot Calibration object.
+GravityTDS gravityTDS;                      // DFRobot object.
 
 float tdsTemp;
 char tdsValue_1[4];
-
 unsigned long prevTime = 0;
 
 // DEFINITIONS
-void flushBuffers();
+float fetchTDS();
 void clearSerialBuffer(SoftwareSerial& serial);
 void clearHardwareBuffer(HardwareSerial& serial);
-float fetchTDS();
+void applyHC12Settings(HardwareSerial& hSerial, SoftwareSerial& sSerial);
 
 /*  ==================================================
     SETUP
@@ -52,7 +45,8 @@ void setup() {
   HC12.begin(38400);
   clearHardwareBuffer(Serial);
   clearSerialBuffer(HM10);
-  clearSerialBuffer(HC12);
+  pinMode(setPin, OUTPUT);
+  applyHC12Settings(Serial, HC12);
 }
 
 /*  ==================================================
@@ -60,9 +54,12 @@ void setup() {
     ================================================== */
 void loop() {
 
-  if( Serial.available() ) {
+  /*if( Serial.available() ) {
     HM10.write(Serial.read());
   }
+  if( HC12.available() ) {
+    Serial.write(HC12.read());
+  }*/
 
   // Send Probe 1 Data every 1000 ms.
   unsigned long currTime = millis();
@@ -106,3 +103,27 @@ void clearHardwareBuffer(HardwareSerial& serial) {
   }
 }
 
+void applyHC12Settings(HardwareSerial& hSerial, SoftwareSerial& sSerial) {
+  digitalWrite(setPin, LOW);
+  delay(50);
+  HC12.print("AT+C033");
+  delay(50);
+  HC12.print("AT+B38400");
+  delay(50);
+  HC12.print("AT+V");
+  delay(50);
+  Serial.println("[First Nano, HC-12] AT Command Output:");
+  while( HC12.available() ) {
+    Serial.write(HC12.read());
+  }
+  Serial.println();
+  digitalWrite(setPin, HIGH);
+  delay(50);
+  clearHardwareBuffer(hSerial);
+  clearSerialBuffer(sSerial);
+  delay(1000);
+  Serial.end();
+  Serial.begin(9600);
+  clearHardwareBuffer(hSerial);
+  delay(1000);
+}
