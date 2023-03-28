@@ -8,8 +8,6 @@
     RX of BT module receives TDS Sensor data and transmit to Android app.
     ================================================== */
 
-    // Any reference to timing/clock cycling in milliseconds doesn't account for latency of the B.T. serial communcation and the Arduino's processor itself (lag, etc.).
-
 #include <SoftwareSerial.h>
 #include <EEPROM.h>
 #include <Wire.h>
@@ -20,47 +18,51 @@
 #define HMtxPin 11          // D11, Transmit Pin (TX) => BT RX
 #define HCrxPin 5           // D4, Receive Pin (RX) => BT TX
 #define HCtxPin 6           // D5, Transmit Pin (TX) => BT RX
-#define setPin 2            // A0 (D14), TDS Meter Pin, Analog Pin
+#define setPin 2            // D2, Set Pin for BT AT-Commands.
 
-SoftwareSerial HM10(HMrxPin, HMtxPin);      // Open BT Serial, RX | TX
-SoftwareSerial HC12(HCrxPin, HCtxPin);      // Open BT Serial, RX | TX
-GravityTDS gravityTDS;                      // DFRobot object.
+/*  ==================================================
+    Globals
+    ================================================== */
+SoftwareSerial HM10(HMrxPin, HMtxPin);      // Open Software Serial for HM10, RX | TX
+SoftwareSerial HC12(HCrxPin, HCtxPin);      // Open Software Serial for HC12, RX | TX
+GravityTDS gravityTDS;                      // DFRobot GravityTDS object.
 
 float tdsTemp;
 char tdsValue_1[4];
 unsigned long prevTime = 0;
 
-// DEFINITIONS
+/*  ==================================================
+    Function Definitions
+    ================================================== */
 float fetchTDS();
-void clearSerialBuffer(SoftwareSerial& serial);
+void clearSoftwareBuffer(SoftwareSerial& serial);
 void clearHardwareBuffer(HardwareSerial& serial);
-void applyHC12Settings(HardwareSerial& hSerial, SoftwareSerial& sSerial);
+void applyHC12Settings(HardwareSerial& Serial, SoftwareSerial& HC12);
 
 /*  ==================================================
-    SETUP
+    Setup
     ================================================== */
 void setup() {
   Serial.begin(9600);
-  HM10.begin(9600);
-  HC12.begin(38400);
-  clearHardwareBuffer(Serial);
-  clearSerialBuffer(HM10);
+  //HM10.begin(9600);
+  HC12.begin(9600);
   pinMode(setPin, OUTPUT);
+  clearHardwareBuffer(Serial);
+  clearSoftwareBuffer(HC12);
+  //clearSoftwareSerial(HM10)
   applyHC12Settings(Serial, HC12);
 }
 
 /*  ==================================================
-    LOOP
+    Loop
     ================================================== */
 void loop() {
 
-  /*if( Serial.available() ) {
-    HM10.write(Serial.read());
-  }
   if( HC12.available() ) {
     Serial.write(HC12.read());
-  }*/
+  }
 
+  /*
   // Send Probe 1 Data every 1000 ms.
   unsigned long currTime = millis();
   if( currTime -  prevTime >= 1000UL ) {
@@ -72,6 +74,7 @@ void loop() {
     HM10.println();
     delay(50);
   }
+  */
 
 }
 
@@ -91,39 +94,45 @@ float fetchTDS() {
   return tdsValue;
 }
 
-void clearSerialBuffer(SoftwareSerial& serial) {
+/*  ==================================================
+    clearSoftwareBuffer
+    ================================================== */
+void clearSoftwareBuffer(SoftwareSerial& serial) {
   while (serial.available() > 0) {
     char incomingByte = serial.read();
   }
 }
 
+/*  ==================================================
+    clearHardwareBuffer
+    ================================================== */
 void clearHardwareBuffer(HardwareSerial& serial) {
   while (serial.available() > 0) {
     char incomingByte = serial.read();
   }
 }
 
-void applyHC12Settings(HardwareSerial& hSerial, SoftwareSerial& sSerial) {
+
+/*  ==================================================
+    applyHC12Settings
+    ================================================== */
+void applyHC12Settings(HardwareSerial& Serial, SoftwareSerial& HC12) {
   digitalWrite(setPin, LOW);
   delay(50);
-  HC12.print("AT+C033");
-  delay(50);
-  HC12.print("AT+B38400");
-  delay(50);
   HC12.print("AT+V");
-  delay(50);
-  Serial.println("[First Nano, HC-12] AT Command Output:");
-  while( HC12.available() ) {
+  delay(250);
+  HC12.print("AT+DEFAULT");
+  delay(250);
+
+  Serial.println("[MASTER] AT Command Output:");
+  while( HC12.available() ) {   
     Serial.write(HC12.read());
   }
   Serial.println();
+
   digitalWrite(setPin, HIGH);
-  delay(50);
-  clearHardwareBuffer(hSerial);
-  clearSerialBuffer(sSerial);
-  delay(1000);
-  Serial.end();
-  Serial.begin(9600);
-  clearHardwareBuffer(hSerial);
-  delay(1000);
+  delay(100);
+
+  clearHardwareBuffer(Serial);
+  clearSoftwareBuffer(HC12);
 }

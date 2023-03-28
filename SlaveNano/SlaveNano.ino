@@ -12,7 +12,7 @@
 #include <Wire.h>
 #include "GravityTDS.h"
 
-#define DEBUG false         // Debugging mode.
+#define DEBUG false         // Debugging mode!
 #define HCrxPin 5           // D4, Receive Pin (RX) => BT TX
 #define HCtxPin 6           // D5, Transmit Pin (TX) => BT RX
 #define setPin 2            // D2, Set Pin for BT AT-Commands.
@@ -21,31 +21,29 @@
     Globals
     ================================================== */
 SoftwareSerial HC12(HCrxPin, HCtxPin);      // Open Software Serial, RX | TX
-GravityTDS gravityTDS;                      // DFRobot object.
+GravityTDS gravityTDS;                      // DFRobot GravityTDS object.
 
 float tdsTemp;
-char tdsValue_2[4];                         // Range is 0-9999?
-byte incomingByte;
-String readBuffer = "";
+char tdsValue_2[4];                     
 unsigned long prevTime = 0;
 
 /*  ==================================================
     Function Definitions
     ================================================== */
 float fetchTDS();
-void clearSerialBuffer(SoftwareSerial& serial);
+void clearSoftwareBuffer(SoftwareSerial& serial);
 void clearHardwareBuffer(HardwareSerial& serial);
-void applyHC12Settings(HardwareSerial& hSerial, SoftwareSerial& sSerial);
+void applyHC12Settings(HardwareSerial& Serial, SoftwareSerial& HC12);
 
 /*  ==================================================
     Setup
     ================================================== */
 void setup() {
-  Serial.begin(38400);
+  Serial.begin(9600);
   HC12.begin(38400);
-  clearHardwareBuffer(Serial);
-  clearSerialBuffer(HC12);
   pinMode(setPin, OUTPUT);
+  clearHardwareBuffer(Serial);
+  clearSoftwareBuffer(HC12);
   applyHC12Settings(Serial, HC12);
 }
 
@@ -53,10 +51,8 @@ void setup() {
     Loop
     ================================================== */
 void loop() {
-  while( Serial.available() ) {
-    HC12.write(Serial.read());
-  }
 
+  /*
   unsigned long currTime = millis();
   if( currTime - prevTime >= 1000UL ) {
     prevTime = currTime;
@@ -67,6 +63,7 @@ void loop() {
     HC12.println();
     delay(50);
   }
+  */
 }
 
 /*  ==================================================
@@ -88,7 +85,7 @@ float fetchTDS() {
 /*  ==================================================
     clearSerialBuffer
     ================================================== */
-void clearSerialBuffer(SoftwareSerial& serial) {
+void clearSoftwareBuffer(SoftwareSerial& serial) {
   while (serial.available() > 0) {
     char incomingByte = serial.read();
   }
@@ -107,23 +104,33 @@ void clearHardwareBuffer(HardwareSerial& serial) {
     applyHC12Settings - Apply these on setup. Values aren't
     saved in memory.
     ================================================== */
-void applyHC12Settings(HardwareSerial& hSerial, SoftwareSerial& sSerial) {
+void applyHC12Settings(HardwareSerial& Serial, SoftwareSerial& HC12) {
+  Serial.end();
+  delay(1000);
+  Serial.begin(38400);
+  delay(1000);
   digitalWrite(setPin, LOW);
   delay(50);
-  HC12.print("AT+C033");
-  delay(50);
-  HC12.print("AT+B38400");
-  delay(50);
   HC12.print("AT+V");
-  delay(50);
-  Serial.println("[Second Nano, HC-12] AT Command Output:");
+  delay(250);
+  HC12.print("AT+DEFAULT");
+  delay(250);
+  HC12.print("AT+B38400");
+  delay(250);
+  HC12.print("AT+B38400");
+  
+  Serial.println("[SLAVE] AT Command Output:");
   while( HC12.available() ) {   
     Serial.write(HC12.read());
   }
   Serial.println();
+
   digitalWrite(setPin, HIGH);
-  delay(50);
-  clearHardwareBuffer(hSerial);
-  clearSerialBuffer(sSerial);
-  delay(50);
+  delay(100);
+
+  clearHardwareBuffer(Serial);
+  clearSoftwareBuffer(HC12);
+  delay(1000);
+  Serial.end();
+  delay(1000);
 }
