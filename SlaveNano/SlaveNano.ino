@@ -1,136 +1,99 @@
-/*  ==================================================
-    SLAVE ARDUINO NANO
-    Hardware Modules:
-    - HC-12 Bluetooth Transceiver
-    - DFRobot Gravity: Analog TDS Sensor/Meter
-    Analog read-in from TDS Sensor and transmits over BT to
-    Master Nano.
-    ================================================== */
-
 #include <SoftwareSerial.h>
-#include <EEPROM.h>
-#include <Wire.h>
-#include "GravityTDS.h"
+#include <GravityTDS.h>
 
-#define DEBUG false         // Debugging mode!
-#define HCrxPin 5           // D4, Receive Pin (RX) => BT TX
-#define HCtxPin 6           // D5, Transmit Pin (TX) => BT RX
-#define setPin 2            // D2, Set Pin for BT AT-Commands.
+#define TDS_Pin A0
+#define DEBUG 0
 
-/*  ==================================================
-    Globals
-    ================================================== */
-SoftwareSerial HC12(HCrxPin, HCtxPin);      // Open Software Serial, RX | TX
-GravityTDS gravityTDS;                      // DFRobot GravityTDS object.
+// MACRO DEFINTION FOR PRINT DEBUGGING
+#if DEBUG == 0
+	#define debug(x) Serial.print(x)
+	#define debugln(x) Serial.println(x)
+#else
+	#define debug(x)
+	#define debugln(x)
+#endif
 
-float tdsTemp;
-char tdsValue_2[4];                     
-unsigned long prevTime = 0;
+typedef enum STATE {
+	SLEEP,
+	RUN,
+} STATE;
 
-/*  ==================================================
-    Function Definitions
-    ================================================== */
-float fetchTDS();
-void clearSoftwareBuffer(SoftwareSerial& serial);
-void clearHardwareBuffer(HardwareSerial& serial);
-void applyHC12Settings(HardwareSerial& Serial, SoftwareSerial& HC12);
+GravityTDS TDS;
+SoftwareSerial HC12(10, 11);	//HC12 TX, HC12 RX
 
-/*  ==================================================
-    Setup
-    ================================================== */
+/* ------------------------------------------------- */
+
+const size_t SIZE = 4;
+STATE program_state = SLEEP;
+char tds_2[SIZE];
+
+/* ------------------------------------------------- */
+
 void setup() {
-  Serial.begin(9600);
-  HC12.begin(38400);
-  pinMode(setPin, OUTPUT);
-  clearHardwareBuffer(Serial);
-  clearSoftwareBuffer(HC12);
-  applyHC12Settings(Serial, HC12);
+	Serial.begin(9600); 
+  while( !Serial ) {}
+  clear_serials(Serial);
+	debugln("<SLAVE SERIAL READY>");
+
+	HC12.begin(19200); 
+  while( !HC12 ) {}
+  clear_serials(HC12);
+	debugln("<HC12 READY>");
+
+	TDS.setPin(TDS_Pin);
+	TDS.begin();
 }
 
-/*  ==================================================
-    Loop
-    ================================================== */
 void loop() {
-
-  /*
-  unsigned long currTime = millis();
-  if( currTime - prevTime >= 1000UL ) {
-    prevTime = currTime;
-    tdsTemp = fetchTDS();
-    dtostrf(tdsTemp, 3, 0, tdsValue_2);
-    HC12.print("Probe 2: ");
-    HC12.write(tdsValue_2);
-    HC12.println();
-    delay(50);
-  }
-  */
-}
-
-/*  ==================================================
-    fetchTDS
-    Calculates the TDS reading from the meter/probe.
-    Utilizes the built-in library from GravityTDS.
-    ================================================== */
-float fetchTDS() {
-  gravityTDS.update();
-  float tdsValue = gravityTDS.getTdsValue();
-  if( DEBUG ) { 
-    Serial.print("TDS: ");
-    Serial.print(tdsValue, 0);
-    Serial.println("ppm");
-  }
-  return tdsValue;
-}
-
-/*  ==================================================
-    clearSerialBuffer
-    ================================================== */
-void clearSoftwareBuffer(SoftwareSerial& serial) {
-  while (serial.available() > 0) {
-    char incomingByte = serial.read();
+  if( program_state == SLEEP ) {
+    if( fetch_command() == 'S' ) {
+      program_state = RUN;
+      run();
+    }
   }
 }
 
-/*  ==================================================
-    clearHardwareBuffer
-    ================================================== */
-void clearHardwareBuffer(HardwareSerial& serial) {
-  while (serial.available() > 0) {
-    char incomingByte = serial.read();
-  }
+/* ------------------------------------------------- */
+
+void run() {
+  debugln("### PROGRAM RUNNING ###");
+  while( program_state == RUN ) {
+
+    static unsigned long fetch_millis = millis();
+    if( millis() - fetch_millis > 250 ) {
+      fetch_tds();
+      fetch_millis = millis();
+    }
+
+    if( fetch_command() == 'E' ) {
+      clear_serials(Serial);
+      clear_serials(HC12);
+      program_state = SLEEP;
+      debugln("### PROGRAM STOPPING ###");     
+    }
+
+  } 
 }
 
-/*  ==================================================
-    applyHC12Settings - Apply these on setup. Values aren't
-    saved in memory.
-    ================================================== */
-void applyHC12Settings(HardwareSerial& Serial, SoftwareSerial& HC12) {
-  Serial.end();
-  delay(1000);
-  Serial.begin(38400);
-  delay(1000);
-  digitalWrite(setPin, LOW);
-  delay(50);
-  HC12.print("AT+V");
-  delay(250);
-  HC12.print("AT+DEFAULT");
-  delay(250);
-  HC12.print("AT+B38400");
-  delay(250);
-  HC12.print("AT+B38400");
-  
-  Serial.println("[SLAVE] AT Command Output:");
-  while( HC12.available() ) {   
-    Serial.write(HC12.read());
+/* ------------------------------------------------- */
+
+void fetch_tds() {
+  TDS.update();
+  snprintf(tds_2, SIZE + 1, "%u$", (size_t)TDS.getTdsValue()); // Might need to add +1???
+  HC12.write(tds_2, SIZE + 1);
+}
+
+char fetch_command() {
+  if( HC12.available() ) {
+    return HC12.read();
   }
-  Serial.println();
+  return 0;
+}
 
-  digitalWrite(setPin, HIGH);
-  delay(100);
+/* ------------------------------------------------- */
 
-  clearHardwareBuffer(Serial);
-  clearSoftwareBuffer(HC12);
-  delay(1000);
-  Serial.end();
-  delay(1000);
+void clear_serials(Stream& stream) {
+  while( stream.available() ) {
+    stream.read();
+  }
 }
