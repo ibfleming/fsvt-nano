@@ -1,5 +1,5 @@
 /*
-   Slave NANO v3.1 (10/20/2023)
+   Slave NANO v3.3 (10/20/2023)
    by Ian B. Fleming 
    Email: ianfleming678@gmail.com
 
@@ -11,6 +11,7 @@
 #include <SoftwareSerial.h>
 
 #define TDS_Pin A0
+#define BATT_Pin A3
 #define TdsFactor 0.5
 #define DEBUG 1
 
@@ -49,6 +50,7 @@ float kVal = 0.56;
 
 STATE state = STOP;
 char tds[SIZE];
+char batt[SIZE];
 
 /*******************************************
  * Setup()
@@ -63,9 +65,10 @@ void setup() {
    while( !HC12 ) {}
 
    clear_all_serials();
-   pinMode(TDS_Pin, INPUT); // TDS pin is open as input
+   pinMode(TDS_Pin, INPUT);   // TDS pin is open as input
+   pinMode(BATT_Pin, INPUT);  // Battery pin is open as input
 
-   debugln("Slave NANO (v3.2)");
+   debugln("Slave NANO (v3.3)");
    debugln("[PROGRAM READY]");
 }
 
@@ -79,6 +82,7 @@ void loop() {
          if( read_cmd() == 'S' ) {
             exec_start();
          }
+         check_battery();
          break;
 
       case RUN:
@@ -110,6 +114,7 @@ void exec() {
 void exec_stop() {
    clear_all_serials();
    memset(tds, 0, SIZE);
+   memset(batt, 0, SIZE);
    state = STOP;
 
    // Debug
@@ -123,6 +128,13 @@ void exec_start() {
 
    // Debug
    debugln("[RUN]");
+}
+
+void check_battery() {
+   memset(batt, 0, SIZE);
+   float voltage = analogRead(BATT_Pin) * (5.0 / 1023.0);
+   snprintf_P(batt, SIZE, "%u#", (unsigned int)voltage);
+   HC12.write(batt);
 }
 
 /*******************************************
@@ -160,6 +172,7 @@ void clear_all_serials() {
 /*******************************************
  * Read and calculate TDS value
  *******************************************/
+ 
  float getTDS() {
    float analogValue = analogRead(TDS_Pin);
    float voltage = analogValue / adcRange * aRef;
