@@ -1,25 +1,26 @@
 /*
-   Master NANO v3.1 (10/20/2023)
+   Master NANO v3.4 (11/27/2023)
    by Ian B. Fleming 
    Email: ianfleming678@gmail.com
 
    HM10 Configuration:
-   Name: FSVT-BLE
-   Baud: 38400 
+      Name: FSVT-BLE
+      Baud: 38400 
 
    HC12 Configuration:
-   Channel: 33?
-   Baud: 38400?
+      Channel: 33
+      Baud: 38400
 */
 
 #include <SoftwareSerial.h>
 
 #define TDS_Pin A0
+#define BATT_Pin A3
 #define TdsFactor 0.5
 #define DEBUG 1
 
 // Enable debugging print-outs to Serial Monitor
-#if DEBUG == 0
+#if DEBUG == 1
 	#define debug(x) Serial.print(x)
 	#define debugln(x) Serial.println(x)
 #else
@@ -55,6 +56,8 @@ float kVal = 0.56;
 STATE state = STOP;
 char tds_1[SIZE];
 char tds_2[SIZE];
+char batt_1[SIZE];
+char batt_2[SIZE];
 
 /*******************************************
  * Setup()
@@ -72,9 +75,10 @@ void setup() {
    while( !HM10 ) {}
 
    clear_all_serials();
-   pinMode(TDS_Pin, INPUT); // TDS pin is open as input
+   pinMode(TDS_Pin, INPUT);   // TDS pin is open as input
+   pinMode(BATT_Pin, INPUT);  // Battery pin is open as input
 
-   debugln("Master NANO (v3.2)");
+   debugln("Master NANO (v3.4)");
    debugln("[PROGRAM READY]");
 }
 
@@ -88,8 +92,8 @@ void loop() {
          if( read_cmd() == 'S' ) {
             exec_start();
          }
+         check_battery();  // Every 1000ms
          break;
-
       case RUN:
          if( read_cmd() == 'E' ) {
             exec_stop();
@@ -108,7 +112,7 @@ void loop() {
  *******************************************/
 
 void exec() {
-   // (1) Read the data
+   // (1) Read the data every 250ms
    static unsigned long read_time = millis();
    if( millis() - read_time > 250 ) {
 
@@ -123,9 +127,9 @@ void exec() {
 }
 
 void exec_stop() {
-   acknowledge();                         // (1) Send acknowledgement to application
-   write_stop();                          // (2) Write stop command to HC12
-   clear_all_serials();                   // (3) Clear all the serials
+   acknowledge();                          // (1) Send acknowledgement to application
+   write_stop();                           // (2) Write stop command to HC12
+   clear_all_serials();                    // (3) Clear all the serials
    memset(tds_1, 0, SIZE);                 // (4) Wipe TDS buffers
    memset(tds_2, 0, SIZE);
    state = STOP;
@@ -137,10 +141,27 @@ void exec_stop() {
 void exec_start() {
    write_start();                         // (1) Write start command to HC12
    clear_all_serials();                   // (2) Clear all the serials
+   memset(batt_1, 0, SIZE);
+   memset(batt_2, 0, SIZE);
    state = RUN;
 
    // Debug
    debugln("[RUN]");
+}
+
+void check_battery() {
+   // (1) Read the battery levels every second on this device and HC12 every second
+   static unsigned long battery_time = millis();
+   if( millis() - battery_time > 1000 ) {
+
+      read_master_batt();
+      read_slave_batt();
+      write_battery();
+      battery_time = millis();
+
+      // Debug
+      debug("B1: "); debug(batt_1); debug(" B2: "); debugln(batt_2);
+   }
 }
 
 /*******************************************
@@ -154,20 +175,30 @@ void acknowledge() {
 }
 
 void write_stop() {
-   // Repeat write three times -> ensures HC12 has received w/o acknowledge
-   for( int i = 0; i < 3; i++ ) {
+   // Repeat write six times -> ensures HC12 has received w/o acknowledgement
+   for( int i = 0; i < 6; i++ ) {
       delay(10);
       HC12.write('E');
    }
 }
 
 void write_start() {
-   HC12.write('S');
+   // Repeat write six times -> ensures HC12 has received w/o acknowledgement
+   for( int i = 0; i < 6; i++ ) {
+      delay(10);
+      HC12.write('S');
+   }
 }
 
 void write_data() {
    char msg[2 * SIZE + 1];
    snprintf(msg, sizeof(msg), "%s:%s", tds_1, tds_2);
+   HM10.write(msg);
+}
+
+void write_battery() {
+   char msg[2 * SIZE +1];
+   snprintf(msg, sizeof(msg), "%sV%s", batt_1, batt_2);
    HM10.write(msg);
 }
 
@@ -178,6 +209,12 @@ void write_data() {
 void read_master_tds() {
    memset(tds_1, 0, SIZE);
    snprintf(tds_1, SIZE, "%u", (unsigned int)getTDS());
+}
+
+void read_master_batt() {
+   memset(batt_1, 0, SIZE);
+   float voltage = analogRead(BATT_Pin) * (5.0 / 1023.0);
+   dtostrf(voltage, 4, 2, batt_1);
 }
 
 void read_slave_tds(unsigned long read_time) {
@@ -201,6 +238,31 @@ void read_slave_tds(unsigned long read_time) {
    if( idx == 0 ) {
       debugln("# Invalid TDS2 #");
       tds_2[idx++] = '0'; tds_2[idx] = '\0'; // TDS will default to 0.
+      return;
+   }
+}
+
+void read_slave_batt() {
+   size_t idx = 0;
+
+   HC12.listen();
+   delay(250);
+   while(HC12.available() && idx < (SIZE - 1)) {
+      char c = HC12.read();
+      if( c == '#' ) {
+         batt_2[idx] = '\0';
+         return;
+      }
+      if( isdigit(c) ) {
+         batt_2[idx++] = c;
+      }
+   }
+
+   // IF nothing is read or artifacts
+   if( idx == 0 ) {
+      debugln("# Invalid Battery (Probe 2) #");
+      batt_2[idx++] = '0'; batt_2[idx] = '\0';
+      // Use the last battery level? Don't memset batt_2...
       return;
    }
 }
@@ -232,6 +294,7 @@ void clear_all_serials() {
 /*******************************************
  * Read and calculate TDS value
  *******************************************/
+
  float getTDS() {
    float analogValue = analogRead(TDS_Pin);
    float voltage = analogValue / adcRange * aRef;
