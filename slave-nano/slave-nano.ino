@@ -1,21 +1,22 @@
 /*
-   Slave NANO v3.1 (10/20/2023)
+   Slave NANO v3.4 (11/27/2023)
    by Ian B. Fleming 
    Email: ianfleming678@gmail.com
 
    HC12 Configuration:
-   Channel: 33?
-   Baud: 38400?
+      Channel: 33
+      Baud: 38400
 */
 
 #include <SoftwareSerial.h>
 
 #define TDS_Pin A0
+#define BATT_Pin A3
 #define TdsFactor 0.5
 #define DEBUG 1
 
 // Enable debugging print-outs to Serial Monitor
-#if DEBUG == 0
+#if DEBUG == 1
 	#define debug(x) Serial.print(x)
 	#define debugln(x) Serial.println(x)
 #else
@@ -49,6 +50,7 @@ float kVal = 0.56;
 
 STATE state = STOP;
 char tds[SIZE];
+char batt[SIZE];
 
 /*******************************************
  * Setup()
@@ -63,9 +65,10 @@ void setup() {
    while( !HC12 ) {}
 
    clear_all_serials();
-   pinMode(TDS_Pin, INPUT); // TDS pin is open as input
+   pinMode(TDS_Pin, INPUT);   // TDS pin is open as input
+   pinMode(BATT_Pin, INPUT);  // Battery pin is open as input
 
-   debugln("Slave NANO (v3.2)");
+   debugln("Slave NANO (v3.4)");
    debugln("[PROGRAM READY]");
 }
 
@@ -79,6 +82,7 @@ void loop() {
          if( read_cmd() == 'S' ) {
             exec_start();
          }
+         check_battery();  // Every 250ms
          break;
 
       case RUN:
@@ -99,7 +103,7 @@ void loop() {
  *******************************************/
 
 void exec() {
-   // (1) Read the data
+   // (1) Read the data every 250ms
    static unsigned long read_time = millis();
    if( millis() - read_time > 250 ) {
       read_tds();                         // (1) Read TDS Probe 2           
@@ -110,6 +114,7 @@ void exec() {
 void exec_stop() {
    clear_all_serials();
    memset(tds, 0, SIZE);
+   memset(batt, 0, SIZE);
    state = STOP;
 
    // Debug
@@ -123,6 +128,22 @@ void exec_start() {
 
    // Debug
    debugln("[RUN]");
+}
+
+void check_battery() {
+   // (1) Read the battery levels every 250ms
+   static unsigned long battery_time = millis();
+   if( millis() - battery_time > 250 ) {
+      memset(batt, 0, SIZE);
+
+      float voltage = analogRead(BATT_Pin) * (5.0 / 1023.0);
+      dtostrf(voltage, 4, 2, batt);
+      HC12.write(batt);
+      battery_time = millis();
+
+      // Debugs
+      debugln(batt);
+   }
 }
 
 /*******************************************
@@ -160,6 +181,7 @@ void clear_all_serials() {
 /*******************************************
  * Read and calculate TDS value
  *******************************************/
+ 
  float getTDS() {
    float analogValue = analogRead(TDS_Pin);
    float voltage = analogValue / adcRange * aRef;
