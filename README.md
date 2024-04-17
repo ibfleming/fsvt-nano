@@ -1,3 +1,5 @@
+![Sample Image](https://github.com/ibfleming/fsvt-nano/blob/master/imgs/sample.png)
+
 # Free Stream Velocity Team - Arduino Nano Programs
 
 **Version:** 3.4
