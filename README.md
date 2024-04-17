@@ -10,7 +10,7 @@ Welcome to the repository containing the software uploaded to the Arduino Nano m
 
 ## Overview
 
-The project utilizes two Arduino Nano microcontrollers: a primary (master) and a secondary (slave). Each microcontroller is equipped with an HC-12 wireless transceiver and a TDS probe. Additionally, the primary Nano features an HM-10 Bluetooth module. The software's primary function is to acquire Total Dissolved Solids (TDS) readings at specified intervals and transmit them wirelessly to an Android application for processing. Furthermore, the microcontrollers facilitate seamless communication of user commands and inputs between each other.
+The project utilizes two Arduino Nano microcontrollers: a primary (master) and a secondary (slave). Each microcontroller is equipped with an HC-12 wireless transceiver and a TDS probe. Additionally, the primary Nano features an HM-10 Bluetooth module. The software's primary function is to acquire Total Dissolved Solids (TDS) readings at specified intervals and transmit them wirelessly to an [Android application](https://github.com/ibfleming/fsvt-app) for processing. Furthermore, the microcontrollers facilitate seamless communication of user commands and inputs between each other.
 
 ## Key Features
 
