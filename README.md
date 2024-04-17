@@ -33,7 +33,3 @@ Please note that the usage and installation of the software are restricted to au
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-Feel free to adjust any details as needed, and best of luck with your future presentations to employers!
